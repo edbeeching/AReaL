@@ -171,14 +171,12 @@ def test_get_custom_dataset_generic_sft_prompt_completion_masks_completion_only(
     expected_input_ids = _tokenize_messages(
         tokenizer, messages, add_generation_prompt=False
     )
-    prompt_ids = _tokenize_messages(
-        tokenizer, messages[:1], add_generation_prompt=True
-    )
+    prompt_ids = _tokenize_messages(tokenizer, messages[:1], add_generation_prompt=True)
 
     assert result[0]["input_ids"] == expected_input_ids
-    assert result[0]["loss_mask"] == [0] * len(prompt_ids) + [
-        1
-    ] * (len(expected_input_ids) - len(prompt_ids))
+    assert result[0]["loss_mask"] == [0] * len(prompt_ids) + [1] * (
+        len(expected_input_ids) - len(prompt_ids)
+    )
 
 
 def test_get_custom_dataset_generic_sft_messages_masks_assistant_turns(
@@ -237,7 +235,8 @@ def test_get_custom_dataset_generic_loader_forwards_config_name_split_and_messag
 
 def test_train_dataset_config_requires_prompt_and_completion_columns() -> None:
     with pytest.raises(
-        ValueError, match="prompt_column and completion_column must be provided together"
+        ValueError,
+        match="prompt_column and completion_column must be provided together",
     ):
         TrainDatasetConfig(path="acme/bad-config", type="rl", prompt_column="prompt")
 

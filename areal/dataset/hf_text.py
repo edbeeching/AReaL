@@ -51,11 +51,7 @@ def _build_rl_dataset(dataset: Dataset, dataset_config: _DatasetConfig, tokenize
         prompt_column, completion_column = prompt_completion_columns
 
         def process(sample: dict[str, Any]) -> dict[str, Any]:
-            result = {
-                "messages": [
-                    {"role": "user", "content": sample[prompt_column]}
-                ]
-            }
+            result = {"messages": [{"role": "user", "content": sample[prompt_column]}]}
             if "answer" not in sample:
                 result["answer"] = sample[completion_column]
             return result
@@ -154,7 +150,10 @@ def _resolve_messages_column(
 ) -> str | None:
     if dataset_config.messages_column is not None:
         _require_column(
-            column_names, dataset_config.messages_column, dataset_config.path, "messages"
+            column_names,
+            dataset_config.messages_column,
+            dataset_config.path,
+            "messages",
         )
         return dataset_config.messages_column
     if "messages" in column_names:
@@ -188,7 +187,9 @@ def _require_column(
         )
 
 
-def _validate_messages(messages: Any, path: str, column_name: str) -> list[dict[str, Any]]:
+def _validate_messages(
+    messages: Any, path: str, column_name: str
+) -> list[dict[str, Any]]:
     if not isinstance(messages, list) or any(
         not isinstance(message, dict)
         or "role" not in message
@@ -201,7 +202,9 @@ def _validate_messages(messages: Any, path: str, column_name: str) -> list[dict[
     return messages
 
 
-def _messages_to_sft_example(messages, tokenizer, path: str) -> tuple[list[int], list[int]]:
+def _messages_to_sft_example(
+    messages, tokenizer, path: str
+) -> tuple[list[int], list[int]]:
     if not messages:
         raise ValueError(f"Dataset {path!r} contains an empty messages list.")
 
