@@ -221,9 +221,16 @@ actor:
       cmd: python3 -m areal.infra.rpc.rpc_server
 
 valid_dataset:
-  name: gsm8k
+  path: acme/eval-dataset
+  type: rl
+  config_name: default
   split: test
   batch_size: 32
+  # For generic chat datasets:
+  # messages_column: messages
+  # For prompt/target datasets:
+  # prompt_column: prompt
+  # completion_column: completion
 ```
 
 ## Logging Results
