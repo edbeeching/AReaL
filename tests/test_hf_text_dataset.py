@@ -233,6 +233,34 @@ def test_get_custom_dataset_generic_loader_forwards_config_name_split_and_messag
     assert result[0]["metadata"] == 7
 
 
+def test_get_custom_dataset_generic_loader_uses_default_num_proc_for_preprocessing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen_num_proc: list[int | None] = []
+    chat_messages = [{"role": "user", "content": "Ping"}]
+    dataset = Dataset.from_list(
+        [{"messages": chat_messages, "metadata": idx} for idx in range(30)]
+    )
+    _patch_load_dataset(monkeypatch, dataset)
+    monkeypatch.setattr(hf_text_dataset.os, "cpu_count", lambda: 64)
+
+    original_map = Dataset.map
+
+    def fake_map(self, function, *args: Any, **kwargs: Any):
+        seen_num_proc.append(kwargs.get("num_proc"))
+        kwargs["num_proc"] = 1
+        return original_map(self, function=function, *args, **kwargs)
+
+    monkeypatch.setattr(Dataset, "map", fake_map)
+
+    dataset_config = TrainDatasetConfig(path="acme/chat-num-proc", type="rl")
+
+    result = get_custom_dataset(split="train", dataset_config=dataset_config)
+
+    assert seen_num_proc == [24]
+    assert result[0]["messages"] == chat_messages
+
+
 def test_train_dataset_config_requires_prompt_and_completion_columns() -> None:
     with pytest.raises(
         ValueError,
@@ -253,6 +281,14 @@ def test_train_dataset_config_rejects_mixed_messages_and_prompt_columns() -> Non
             prompt_column="prompt",
             completion_column="completion",
         )
+
+
+def test_train_dataset_config_requires_positive_num_proc() -> None:
+    with pytest.raises(
+        ValueError,
+        match="num_proc must be a positive integer or None",
+    ):
+        TrainDatasetConfig(path="acme/bad-config", type="rl", num_proc=0)
 
 
 def test_get_custom_dataset_generic_loader_requires_supported_schema(

@@ -2099,6 +2099,12 @@ class _DatasetConfig:
     num_workers: int = field(
         default=0, metadata={"help": "Number of worker processes for data loading"}
     )
+    num_proc: int | None = field(
+        default=24,
+        metadata={
+            "help": "Maximum number of worker processes for Hugging Face dataset preprocessing."
+        },
+    )
     drop_last: bool = field(
         default=True, metadata={"help": "Drop the last incomplete batch"}
     )
@@ -2119,6 +2125,8 @@ class _DatasetConfig:
             raise ValueError(
                 "messages_column cannot be combined with prompt_column/completion_column."
             )
+        if self.num_proc is not None and self.num_proc < 1:
+            raise ValueError("num_proc must be a positive integer or None.")
 
 
 @dataclass

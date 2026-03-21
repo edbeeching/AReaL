@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any
 
 from datasets import load_dataset
@@ -40,6 +41,31 @@ def get_hf_text_dataset(
     )
 
 
+def _map_dataset(
+    dataset: Dataset, process, dataset_config: _DatasetConfig, **kwargs
+) -> Dataset:
+    return dataset.map(
+        process,
+        num_proc=_resolve_num_proc(dataset, dataset_config),
+        **kwargs,
+    )
+
+
+def _resolve_num_proc(dataset: Dataset, dataset_config: _DatasetConfig) -> int | None:
+    if dataset_config.num_proc is None:
+        return None
+
+    num_rows = dataset.num_rows
+    if num_rows <= 0:
+        return None
+
+    num_proc = min(dataset_config.num_proc, num_rows)
+    cpu_count = os.cpu_count()
+    if cpu_count is not None:
+        num_proc = min(num_proc, cpu_count)
+    return max(1, num_proc)
+
+
 def _build_rl_dataset(dataset: Dataset, dataset_config: _DatasetConfig, tokenizer):
     column_names = list(dataset.column_names)
     prompt_completion_columns = _resolve_prompt_completion_columns(
@@ -56,7 +82,7 @@ def _build_rl_dataset(dataset: Dataset, dataset_config: _DatasetConfig, tokenize
                 result["answer"] = sample[completion_column]
             return result
 
-        dataset = dataset.map(process)
+        dataset = _map_dataset(dataset, process, dataset_config)
     elif messages_column is not None:
 
         def process(sample: dict[str, Any]) -> dict[str, Any]:
@@ -66,7 +92,7 @@ def _build_rl_dataset(dataset: Dataset, dataset_config: _DatasetConfig, tokenize
                 )
             }
 
-        dataset = dataset.map(process)
+        dataset = _map_dataset(dataset, process, dataset_config)
     else:
         raise ValueError(
             f"Dataset {dataset_config.path!r} is not handled by a built-in adapter, and generic RL loading requires either a 'messages' column or configured prompt_column/completion_column fields."
@@ -119,7 +145,12 @@ def _build_sft_dataset(dataset: Dataset, dataset_config: _DatasetConfig, tokeniz
                 "loss_mask": _build_suffix_mask(len(input_ids), len(prompt_ids)),
             }
 
-        dataset = dataset.map(process, remove_columns=column_names)
+        dataset = _map_dataset(
+            dataset,
+            process,
+            dataset_config,
+            remove_columns=column_names,
+        )
     elif messages_column is not None:
 
         def process(sample: dict[str, Any]) -> dict[str, list[int]]:
@@ -131,7 +162,12 @@ def _build_sft_dataset(dataset: Dataset, dataset_config: _DatasetConfig, tokeniz
             )
             return {"input_ids": input_ids, "loss_mask": loss_mask}
 
-        dataset = dataset.map(process, remove_columns=column_names)
+        dataset = _map_dataset(
+            dataset,
+            process,
+            dataset_config,
+            remove_columns=column_names,
+        )
     else:
         raise ValueError(
             f"Dataset {dataset_config.path!r} is not handled by a built-in adapter, and generic SFT loading requires either a 'messages' column or configured prompt_column/completion_column fields."

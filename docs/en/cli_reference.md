@@ -636,6 +636,7 @@ Configuration for training dataset loading and preprocessing.
 | `shuffle`           | boolean         | `True`       | Whether to shuffle the dataset                                                          |
 | `pin_memory`        | boolean         | `False`      | Pin memory for faster data loading (set True for GPU training)                          |
 | `num_workers`       | integer         | `0`          | Number of worker processes for data loading                                             |
+| `num_proc`          | integer \| None | `24`         | Maximum number of worker processes for Hugging Face dataset preprocessing.              |
 | `drop_last`         | boolean         | `True`       | Drop the last incomplete batch                                                          |
 | `max_length`        | integer \| None | `None`       | Maximum token length of sequences in dataset. Longer sequences are filtered out.        |
 
@@ -661,6 +662,7 @@ default to False.
 | `shuffle`           | boolean         | `False`      | Whether to shuffle the dataset                                                          |
 | `pin_memory`        | boolean         | `False`      | Pin memory for faster data loading (set True for GPU training)                          |
 | `num_workers`       | integer         | `0`          | Number of worker processes for data loading                                             |
+| `num_proc`          | integer \| None | `24`         | Maximum number of worker processes for Hugging Face dataset preprocessing.              |
 | `drop_last`         | boolean         | `False`      | Drop the last incomplete batch                                                          |
 | `max_length`        | integer \| None | `None`       | Maximum token length of sequences in dataset. Longer sequences are filtered out.        |
 
