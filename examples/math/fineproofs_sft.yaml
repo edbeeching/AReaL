@@ -26,6 +26,8 @@ actor:
   init_from_scratch: false
   gradient_checkpointing: true
   dtype: bfloat16
+  attn_impl: kernels-community/flash-attn
+  use_kernels: true
   mb_spec:
     max_tokens_per_mb: 8192
   optimizer:
