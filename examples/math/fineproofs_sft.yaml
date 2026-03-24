@@ -22,18 +22,18 @@ scheduler:
 actor:
   experiment_name: ${experiment_name}
   trial_name: ${trial_name}
-  path: Qwen/Qwen3-1.7B
+  path: Qwen/Qwen3-4B-Thinking-2507
   init_from_scratch: false
   gradient_checkpointing: true
   dtype: bfloat16
   attn_impl: kernels-community/flash-attn
   use_kernels: true
   mb_spec:
-    max_tokens_per_mb: 8192
+    max_tokens_per_mb: 45056
   optimizer:
     type: adam
-    lr: 2e-5
-    weight_decay: 0.05
+    lr: 3e-5
+    weight_decay: 0.00
     beta1: 0.9
     beta2: 0.95
     eps: 1e-5
@@ -48,7 +48,7 @@ actor:
       env_vars: {}
 
 train_dataset:
-  batch_size: 16
+  batch_size: 32
   shuffle: true
   pin_memory: true
   num_workers: 4
@@ -56,19 +56,19 @@ train_dataset:
   config_name: default
   split: train
   messages_column: messages
-  max_length: 8192
+  max_length: 45056
   type: sft
 
 # FineProofs-SFT currently uses the train split for both training and evaluation.
 valid_dataset:
-  batch_size: 16
+  batch_size: 32
   pin_memory: true
   num_workers: 4
   path: lm-provers/FineProofs-SFT
   config_name: default
   split: train
   messages_column: messages
-  max_length: 8192
+  max_length: 45056
   type: sft
 
 # Utilities
@@ -102,4 +102,4 @@ stats_logger:
   trial_name: ${trial_name}
   fileroot: ${cluster.fileroot}
   wandb:
-    mode: disabled
+    mode: online
