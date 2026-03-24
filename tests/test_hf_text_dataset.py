@@ -321,16 +321,9 @@ def test_get_custom_dataset_generic_loader_uses_configured_num_proc_for_preproce
 
 @pytest.mark.slow
 def test_get_custom_dataset_generic_loader_with_real_hf_assets() -> None:
-    from tests.utils import get_dataset_path, get_model_path
+    model_path = "Qwen/Qwen3-0.6B"
+    dataset_path = "lm-provers/FineProofs-SFT"
 
-    model_path = get_model_path(
-        "/storage/openpsi/models/Qwen__Qwen3-0.6B",
-        "Qwen/Qwen3-0.6B",
-    )
-    dataset_path = get_dataset_path(
-        "/storage/openpsi/data/lm-provers__FineProofs-SFT",
-        "lm-provers/FineProofs-SFT",
-    )
     tokenizer = load_hf_tokenizer(model_path)
     dataset_config = TrainDatasetConfig(
         path=dataset_path,
