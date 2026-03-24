@@ -9,6 +9,7 @@ import areal.dataset.gsm8k as gsm8k_dataset
 import areal.dataset.hf_text as hf_text_dataset
 from areal.api.cli_args import TrainDatasetConfig
 from areal.dataset import get_custom_dataset
+from areal.utils.hf_utils import load_hf_tokenizer
 
 
 class DummyChatTokenizer:
@@ -102,6 +103,45 @@ def test_get_custom_dataset_builtin_adapter_takes_precedence(
     )
 
     assert result is sentinel
+
+
+def test_get_custom_dataset_explicit_generic_schema_overrides_builtin_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, Any] = {}
+
+    def fail_get_gsm8k_rl_dataset(*args: Any, **kwargs: Any) -> object:
+        raise AssertionError("generic schema config should bypass the GSM8K adapter")
+
+    monkeypatch.setattr(
+        gsm8k_dataset,
+        "get_gsm8k_rl_dataset",
+        fail_get_gsm8k_rl_dataset,
+    )
+
+    dataset = Dataset.from_list(
+        [{"prompt": "What is 2 + 2?", "completion": "4", "topic": "math"}]
+    )
+    _patch_load_dataset(monkeypatch, dataset, seen)
+
+    dataset_config = TrainDatasetConfig(
+        path="openai/gsm8k",
+        type="rl",
+        config_name="special-subset",
+        prompt_column="prompt",
+        completion_column="completion",
+    )
+
+    result = get_custom_dataset(split="train", dataset_config=dataset_config)
+
+    assert seen == {
+        "path": "openai/gsm8k",
+        "name": "special-subset",
+        "split": "train",
+    }
+    assert result[0]["messages"] == [{"role": "user", "content": "What is 2 + 2?"}]
+    assert result[0]["answer"] == "4"
+    assert result[0]["topic"] == "math"
 
 
 def test_get_custom_dataset_generic_rl_messages_preserves_metadata(
@@ -233,10 +273,11 @@ def test_get_custom_dataset_generic_loader_forwards_config_name_split_and_messag
     assert result[0]["metadata"] == 7
 
 
-def test_get_custom_dataset_generic_loader_uses_default_num_proc_for_preprocessing(
+def test_get_custom_dataset_generic_loader_uses_configured_num_proc_for_preprocessing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    seen_num_proc: list[int | None] = []
+    seen_num_proc: dict[str, list[int | None]] = {"map": [], "filter": []}
+    tokenizer = DummyChatTokenizer()
     chat_messages = [{"role": "user", "content": "Ping"}]
     dataset = Dataset.from_list(
         [{"messages": chat_messages, "metadata": idx} for idx in range(30)]
@@ -245,20 +286,74 @@ def test_get_custom_dataset_generic_loader_uses_default_num_proc_for_preprocessi
     monkeypatch.setattr(hf_text_dataset.os, "cpu_count", lambda: 64)
 
     original_map = Dataset.map
+    original_filter = Dataset.filter
 
     def fake_map(self, function, *args: Any, **kwargs: Any):
-        seen_num_proc.append(kwargs.get("num_proc"))
+        seen_num_proc["map"].append(kwargs.get("num_proc"))
         kwargs["num_proc"] = 1
         return original_map(self, function=function, *args, **kwargs)
 
+    def fake_filter(self, function, *args: Any, **kwargs: Any):
+        seen_num_proc["filter"].append(kwargs.get("num_proc"))
+        kwargs["num_proc"] = 1
+        return original_filter(self, function=function, *args, **kwargs)
+
     monkeypatch.setattr(Dataset, "map", fake_map)
+    monkeypatch.setattr(Dataset, "filter", fake_filter)
 
-    dataset_config = TrainDatasetConfig(path="acme/chat-num-proc", type="rl")
+    dataset_config = TrainDatasetConfig(
+        path="acme/chat-num-proc",
+        type="rl",
+        max_length=1000,
+        num_proc=7,
+    )
 
-    result = get_custom_dataset(split="train", dataset_config=dataset_config)
+    result = get_custom_dataset(
+        split="train",
+        dataset_config=dataset_config,
+        tokenizer=tokenizer,
+    )
 
-    assert seen_num_proc == [24]
+    assert seen_num_proc["map"][0] == 7
+    assert seen_num_proc["filter"] == [7]
     assert result[0]["messages"] == chat_messages
+
+
+@pytest.mark.slow
+def test_get_custom_dataset_generic_loader_with_real_hf_assets() -> None:
+    from tests.utils import get_dataset_path, get_model_path
+
+    model_path = get_model_path(
+        "/storage/openpsi/models/Qwen__Qwen3-0.6B",
+        "Qwen/Qwen3-0.6B",
+    )
+    dataset_path = get_dataset_path(
+        "/storage/openpsi/data/lm-provers__FineProofs-SFT",
+        "lm-provers/FineProofs-SFT",
+    )
+    tokenizer = load_hf_tokenizer(model_path)
+    dataset_config = TrainDatasetConfig(
+        path=dataset_path,
+        type="sft",
+        config_name="default",
+        split="train[:2]",
+        messages_column="messages",
+        batch_size=1,
+        max_length=4096,
+    )
+
+    dataset = get_custom_dataset(
+        split="train[:2]",
+        dataset_config=dataset_config,
+        tokenizer=tokenizer,
+    )
+
+    assert len(dataset) > 0
+    row = dataset[0]
+    assert sorted(row.keys()) == ["input_ids", "loss_mask"]
+    assert len(row["input_ids"]) == len(row["loss_mask"])
+    assert sum(row["loss_mask"]) > 0
+    assert len(row["input_ids"]) <= 4096
 
 
 def test_train_dataset_config_requires_prompt_and_completion_columns() -> None:

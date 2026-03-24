@@ -221,9 +221,8 @@ actor:
       cmd: python3 -m areal.infra.rpc.rpc_server
 
 valid_dataset:
-  path: acme/eval-dataset
+  path: openai/gsm8k
   type: rl
-  config_name: default
   split: test
   batch_size: 32
   # For generic chat datasets:

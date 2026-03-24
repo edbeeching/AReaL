@@ -51,6 +51,16 @@ def _map_dataset(
     )
 
 
+def _filter_dataset(
+    dataset: Dataset, predicate, dataset_config: _DatasetConfig, **kwargs
+) -> Dataset:
+    return dataset.filter(
+        predicate,
+        num_proc=_resolve_num_proc(dataset, dataset_config),
+        **kwargs,
+    )
+
+
 def _resolve_num_proc(dataset: Dataset, dataset_config: _DatasetConfig) -> int | None:
     if dataset_config.num_proc is None:
         return None
@@ -104,13 +114,15 @@ def _build_rl_dataset(dataset: Dataset, dataset_config: _DatasetConfig, tokenize
                 "A tokenizer is required when max_length is set for generic RL datasets."
             )
 
-        dataset = dataset.filter(
+        dataset = _filter_dataset(
+            dataset,
             lambda sample: len(
                 _tokenize_messages(
                     tokenizer, sample["messages"], add_generation_prompt=True
                 )
             )
-            <= dataset_config.max_length
+            <= dataset_config.max_length,
+            dataset_config,
         )
 
     return dataset
@@ -174,8 +186,10 @@ def _build_sft_dataset(dataset: Dataset, dataset_config: _DatasetConfig, tokeniz
         )
 
     if dataset_config.max_length is not None:
-        dataset = dataset.filter(
-            lambda sample: len(sample["input_ids"]) <= dataset_config.max_length
+        dataset = _filter_dataset(
+            dataset,
+            lambda sample: len(sample["input_ids"]) <= dataset_config.max_length,
+            dataset_config,
         )
 
     return dataset
